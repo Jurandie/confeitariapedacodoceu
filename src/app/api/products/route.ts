@@ -41,7 +41,7 @@ async function ensureUniqueSlug(base: string) {
 }
 
 export async function POST(request: Request) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   if (!(await ownerAuthenticatedFromStore(cookieStore))) {
     return NextResponse.json({ message: "Nao autorizado." }, { status: 401 });
   }

@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  AUTH_COOKIE_NAME,
-  getOwnerCredentials,
-  getOwnerIdentity,
-  getOwnerToken,
-} from "@/lib/server/auth";
+import { AUTH_COOKIE_NAME } from "@/lib/constants";
+import { getOwnerCredentials, getOwnerIdentity, getOwnerToken } from "@/lib/server/auth";
 import { verifyOwnerAccessCode } from "@/lib/server/access-codes";
 
 type LoginPayload = {

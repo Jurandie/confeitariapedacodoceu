@@ -1,9 +1,9 @@
-import "server-only";
+"use server";
 import { createHash } from "node:crypto";
 import process from "node:process";
 import { cookies } from "next/headers";
+import { AUTH_COOKIE_NAME } from "@/lib/constants";
 
-const AUTH_COOKIE_NAME = "doces-owner-auth";
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
 type OwnerConfig = {
@@ -45,14 +45,10 @@ export async function getOwnerToken() {
 }
 
 export async function isOwnerAuthenticated() {
-  const store = await cookies();
-  return ownerAuthenticatedFromStore(store);
+  return ownerAuthenticatedFromStore(await cookies());
 }
 
-export async function ownerAuthenticatedFromStore(store: CookieStore | Promise<CookieStore>) {
-  const resolvedStore = await store;
+export async function ownerAuthenticatedFromStore(store: CookieStore) {
   const token = await getOwnerToken();
-  return resolvedStore.get(AUTH_COOKIE_NAME)?.value === token;
+  return store.get(AUTH_COOKIE_NAME)?.value === token;
 }
-
-export { AUTH_COOKIE_NAME };

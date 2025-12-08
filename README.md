@@ -44,7 +44,10 @@ SMTP_PASSWORD=...
 MAILER_FROM="Doces da Dona <nao-responda@docesdadona.com>"
 ```
 
-Sem SMTP configurado o modo dev apenas loga o código OTP no console; em produção use credenciais reais. Para deploy troque o `DATABASE_URL` para uma instância externa (Postgres/MySQL/etc).
+> **Preparando para Cloudflare Pages**  
+> Ao configurar o projeto no painel da Cloudflare, cadastre exatamente os nomes acima em **Settings → Environment variables**. Para produção, substitua `DATABASE_URL` por um banco acessível pela Cloudflare (ex.: Postgres gerenciado, Supabase, PlanetScale ou Cloudflare D1). Anote a URL de conexão desse banco e cole no lugar de `file:./dev.db`. As chaves `OWNER_*`, `SMTP_*` e `MAILER_FROM` permanecem iguais — apenas utilize credenciais de e-mail reais para que o código OTP chegue na caixa de entrada.
+
+Sem SMTP configurado o modo dev apenas loga o código OTP no console; em produção use credenciais reais.
 
 ## Flows implementados
 

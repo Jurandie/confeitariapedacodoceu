@@ -31,7 +31,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<RouteParams> },
 ) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   if (!(await ownerAuthenticatedFromStore(cookieStore))) {
     return NextResponse.json({ message: "Nao autorizado." }, { status: 401 });
   }
@@ -77,7 +77,7 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<RouteParams> },
 ) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   if (!(await ownerAuthenticatedFromStore(cookieStore))) {
     return NextResponse.json({ message: "Nao autorizado." }, { status: 401 });
   }
