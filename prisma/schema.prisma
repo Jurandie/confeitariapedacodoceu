@@ -81,7 +81,7 @@ model SiteConfig {
   id              String   @id
   heroTitle       String
   heroDescription String
-  heroBadge       String   @default("vitrine artesanal + checkout")
+  heroBadge       String   @default("vitrine artesanal + finalizar pedido")
   heroPanelTopTitle        String   @default("Jornal da cozinha")
   heroPanelTopDescription  String   @default("Receitas novas, ajustes de preco e fotos atualizadas direto da cozinha da JL.")
   heroPanelBottomTitle     String   @default("Panelinha da JL")
@@ -89,4 +89,24 @@ model SiteConfig {
   heroPanelFooter          String   @default("Replique cenarios reais de confeitaria sem precisar de Stripe real. Ideal para apresentar jornadas completas e pontos de personalizacao para clientes gulosos.")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model OwnerAccount {
+  id           String          @id @default(cuid())
+  name         String
+  phone        String          @unique
+  passwordHash String
+  passwordSalt String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  sessions     OwnerSession[]
+}
+
+model OwnerSession {
+  id        String       @id @default(cuid())
+  owner     OwnerAccount @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String
+  token     String       @unique
+  expiresAt Int
+  createdAt DateTime     @default(now())
 }

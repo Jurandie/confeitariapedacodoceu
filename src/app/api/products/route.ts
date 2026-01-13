@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import {
+  createProductRecord,
+  ensureUniqueSlug,
+  listProducts,
+  slugify,
+} from "@/lib/server/storefront-data";
 import { ownerAuthenticatedFromStore } from "@/lib/server/auth";
 
 export async function GET() {
-  const products = await prisma.product.findMany({
-    orderBy: { name: "asc" },
-  });
+  const products = await listProducts();
 
   return NextResponse.json({ products });
 }
@@ -20,60 +23,58 @@ type CreateProductPayload = {
   image?: string;
 };
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-}
-
-async function ensureUniqueSlug(base: string) {
-  const safeBase = base || "doce-da-dona";
-  let slug = safeBase;
-  let suffix = 1;
-  while (true) {
-    const existing = await prisma.product.findUnique({ where: { slug } });
-    if (!existing) return slug;
-    slug = `${safeBase}-${suffix++}`;
-  }
-}
-
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  if (!(await ownerAuthenticatedFromStore(cookieStore))) {
-    return NextResponse.json({ message: "Nao autorizado." }, { status: 401 });
-  }
+  try {
+    const cookieStore = await cookies();
+    if (!(await ownerAuthenticatedFromStore(cookieStore))) {
+      return NextResponse.json({ message: "Nao autorizado." }, { status: 401 });
+    }
 
-  const payload = (await request.json().catch(() => ({}))) as CreateProductPayload;
-  const { name, description, price, stock, category, image } = payload;
+    const payload = (await request.json().catch(() => ({}))) as CreateProductPayload;
+    const { name, description, price, stock, category, image } = payload;
 
-  if (!name || !description || typeof price !== "number") {
-    return NextResponse.json(
-      { message: "Nome, descricao e preco (em centavos) sao obrigatorios." },
-      { status: 400 },
-    );
-  }
+    if (!name || !description || typeof price !== "number") {
+      return NextResponse.json(
+        { message: "Nome, descricao e preco (em centavos) sao obrigatorios." },
+        { status: 400 },
+      );
+    }
 
-  if (price <= 0) {
-    return NextResponse.json({ message: "Preco precisa ser maior que zero." }, { status: 422 });
-  }
+    if (price <= 0) {
+      return NextResponse.json({ message: "Preco precisa ser maior que zero." }, { status: 422 });
+    }
 
-  const normalizedSlug = slugify(name);
-  const slug = await ensureUniqueSlug(normalizedSlug);
+    const inlineImage = typeof image === "string" ? image.trim() : null;
+    const INLINE_IMAGE_LIMIT = 1_000_000; // ~1MB em base64 (~700KB bin) para evitar toobig no D1
+    if (inlineImage && inlineImage.length > INLINE_IMAGE_LIMIT) {
+      return NextResponse.json(
+        { message: "Imagem muito grande. Comprima ou envie um arquivo menor que 500KB." },
+        { status: 413 },
+      );
+    }
 
-  const product = await prisma.product.create({
-    data: {
+    const normalizedSlug = slugify(name);
+    const slug = await ensureUniqueSlug(normalizedSlug);
+
+    const product = await createProductRecord({
       name,
       description,
       price: Math.floor(price),
       stock: typeof stock === "number" && stock >= 0 ? Math.floor(stock) : 20,
       category: category?.trim() || "doces",
-      image: image?.trim() || null,
+      image: inlineImage ?? null,
       slug,
-    },
-  });
+    });
 
-  return NextResponse.json({ product });
+    if (!product) {
+      return NextResponse.json({ message: "Nao foi possivel criar o doce." }, { status: 500 });
+    }
+
+    return NextResponse.json({ product });
+  } catch (error) {
+    console.error("[api/products] erro ao criar doce", error);
+    const message =
+      error instanceof Error ? error.message : "Nao foi possivel criar o doce agora.";
+    return NextResponse.json({ message }, { status: 500 });
+  }
 }

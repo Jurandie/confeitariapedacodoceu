@@ -1,51 +1,56 @@
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/constants";
-import { getOwnerCredentials, getOwnerIdentity, getOwnerToken } from "@/lib/server/auth";
-import { verifyOwnerAccessCode } from "@/lib/server/access-codes";
+import { loginOwnerWithPassword } from "@/lib/server/auth";
 
 type LoginPayload = {
-  email?: string;
-  code?: string;
+  phone?: string;
+  login?: string;
+  password?: string;
 };
 
 export async function POST(request: Request) {
   const data = (await request.json().catch(() => ({}))) as LoginPayload;
-  const { email, code } = data;
-  const { email: ownerEmail } = await getOwnerCredentials();
-  const { name } = await getOwnerIdentity();
+  const phoneValue = (data.login ?? data.phone)?.toString().trim() ?? "";
+  const passwordValue = data.password?.toString().trim() ?? "";
 
-  if (!email || !code) {
+  if (!phoneValue || !passwordValue) {
     return NextResponse.json(
-      { ok: false, message: "Informe email e codigo recebido para acessar o painel." },
+      { ok: false, message: "Informe login e senha para acessar o painel." },
       { status: 400 },
     );
   }
 
-  if (email !== ownerEmail) {
+  try {
+    const result = await loginOwnerWithPassword(phoneValue, passwordValue);
+    if (!result.success) {
+      return NextResponse.json(
+        { ok: false, message: result.message ?? "Login ou senha invalidos." },
+        { status: 401 },
+      );
+    }
+
+    const maxAge = Math.max(
+      60,
+      Math.floor((result.session.expiresAt - Date.now()) / 1000),
+    );
+
+    const response = NextResponse.json({ ok: true, owner: result.owner });
+    const isSecure = new URL(request.url).protocol === "https:";
+    response.cookies.set({
+      name: AUTH_COOKIE_NAME,
+      value: result.session.token,
+      httpOnly: true,
+      sameSite: "strict",
+      secure: isSecure,
+      path: "/",
+      maxAge,
+    });
+    return response;
+  } catch (error) {
+    console.error("[auth/login] erro de autenticacao", error);
     return NextResponse.json(
-      { ok: false, message: "Nao encontramos esse email para o painel." },
-      { status: 401 },
+      { ok: false, message: "Nao foi possivel autenticar agora." },
+      { status: 500 },
     );
   }
-
-  const verification = await verifyOwnerAccessCode(ownerEmail, code);
-  if (!verification.valid) {
-    return NextResponse.json(
-      { ok: false, message: verification.reason ?? "Codigo invalido." },
-      { status: 401 },
-    );
-  }
-
-  const response = NextResponse.json({ ok: true, owner: { email: ownerEmail, name } });
-  const token = await getOwnerToken();
-  response.cookies.set({
-    name: AUTH_COOKIE_NAME,
-    value: token,
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 8,
-  });
-  return response;
 }

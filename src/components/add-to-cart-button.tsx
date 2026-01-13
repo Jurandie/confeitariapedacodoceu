@@ -18,7 +18,7 @@ export function AddToCartButton({ product }: { product: ProductDTO }) {
           quantity: 1,
         })
       }
-      className="rounded-xl bg-[var(--jl-crimson)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--jl-crimson-dark)]"
+      className="rounded-full bg-[var(--jl-crimson)] px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-[var(--jl-crimson-dark)]"
     >
       Adicionar ao carrinho
     </button>

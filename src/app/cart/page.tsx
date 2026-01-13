@@ -1,59 +1,34 @@
 'use client';
 
 import Link from "next/link";
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import { useCartStore, useCartTotals } from "@/contexts/cart-context";
 import { formatCurrency } from "@/lib/pricing";
-import { validateCoupon } from "@/lib/client-api";
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, setCoupon } = useCartStore();
+  const { items, removeItem, updateQuantity } = useCartStore();
   const totals = useCartTotals();
-  const [couponCode, setCouponCode] = useState("");
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  const couponMutation = useMutation({
-    mutationFn: async () => {
-      setFeedback(null);
-      return validateCoupon(couponCode.trim(), items);
-    },
-    onSuccess: (data) => {
-      if (data.valid && data.coupon) {
-        setCoupon(data.coupon, couponCode.trim().toUpperCase());
-        setFeedback(`Cupom ${data.coupon.code} aplicado (${data.coupon.type})`);
-      } else {
-        setCoupon(null);
-        setFeedback("Cupom não aplicável.");
-      }
-    },
-    onError: () => {
-      setCoupon(null);
-      setFeedback("Erro ao validar cupom.");
-    },
-  });
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">
+          <p className="jl-pill inline-flex items-center border-[var(--jl-amber)]/50 bg-[var(--jl-cream)] px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--jl-crimson)]">
             Carrinho
           </p>
-          <h1 className="text-3xl font-semibold text-slate-900">
+          <h1 className="jl-display text-3xl font-semibold text-[var(--foreground)]">
             Itens selecionados ({totals.itemCount})
           </h1>
         </div>
         <Link
           href="/checkout"
-          className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          className="rounded-full bg-[var(--jl-crimson-dark)] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[rgba(74,42,29,0.2)] transition hover:bg-[var(--jl-crimson)]"
         >
-          Ir para checkout
+          Ir para finalizar pedido
         </Link>
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
+        <div className="jl-paper jl-reveal rounded-2xl border border-dashed border-[var(--jl-amber)]/50 p-8 text-center text-[var(--jl-crimson)]/70">
           Carrinho vazio. Escolha produtos no catálogo.
         </div>
       ) : (
@@ -62,38 +37,34 @@ export default function CartPage() {
             {items.map((item) => (
               <div
                 key={item.productId}
-                className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="jl-paper flex items-start justify-between gap-4 rounded-2xl p-4"
               >
                 <div className="space-y-1">
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    {item.name}
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    {formatCurrency(item.price)}
-                  </p>
+                  <h3 className="text-lg font-semibold text-[var(--foreground)]">{item.name}</h3>
+                  <p className="text-sm text-[var(--jl-crimson)]/70">{formatCurrency(item.price)}</p>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                      className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                      className="rounded-lg border border-[var(--jl-amber)]/50 bg-[var(--jl-ivory)] px-2 py-1 text-sm"
                     >
                       -
                     </button>
                     <span className="text-sm font-semibold">{item.quantity}</span>
                     <button
                       onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                      className="rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                      className="rounded-lg border border-[var(--jl-amber)]/50 bg-[var(--jl-ivory)] px-2 py-1 text-sm"
                     >
                       +
                     </button>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-3 text-sm">
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-[var(--foreground)]">
                     {formatCurrency(item.price * item.quantity)}
                   </span>
                   <button
                     onClick={() => removeItem(item.productId)}
-                    className="text-red-500 underline"
+                    className="text-[var(--jl-crimson-light)] underline"
                   >
                     Remover
                   </button>
@@ -102,63 +73,29 @@ export default function CartPage() {
             ))}
           </div>
 
-          <aside className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Resumo</h2>
-            <div className="space-y-2 text-sm text-slate-600">
+          <aside className="jl-paper space-y-4 rounded-2xl p-4">
+            <h2 className="jl-display text-lg font-semibold text-[var(--foreground)]">Resumo</h2>
+            <div className="space-y-2 text-sm text-[var(--jl-crimson)]/70">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-[var(--foreground)]">
                   {formatCurrency(totals.subtotal)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Frete</span>
-                <span className="font-semibold text-slate-900">
-                  {totals.shipping === 0 ? "Grátis" : formatCurrency(totals.shipping)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Desconto</span>
-                <span className="font-semibold text-emerald-600">
-                  -{formatCurrency(totals.discount)}
                 </span>
               </div>
               <hr />
               <div className="flex justify-between text-base">
                 <span>Total</span>
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-[var(--foreground)]">
                   {formatCurrency(totals.total)}
                 </span>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-800">
-                Cupom de desconto
-              </label>
-              <div className="flex gap-2">
-                <input
-                  className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value)}
-                  placeholder="BEMVINDO10"
-                />
-                <button
-                  disabled={couponMutation.isPending}
-                  onClick={() => couponMutation.mutate()}
-                  className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
-                >
-                  Aplicar
-                </button>
-              </div>
-              {feedback && <p className="text-xs text-slate-500">{feedback}</p>}
-            </div>
-
             <Link
               href="/checkout"
-              className="flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+              className="flex w-full items-center justify-center rounded-full bg-[var(--jl-crimson)] px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-[var(--jl-crimson-dark)]"
             >
-              Finalizar
+              Finalizar pedido
             </Link>
           </aside>
         </div>

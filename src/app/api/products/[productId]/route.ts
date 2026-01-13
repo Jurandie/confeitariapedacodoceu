@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import {
+  deleteProductRecord,
+  getProductByIdentifier,
+  updateProductPrice,
+} from "@/lib/server/storefront-data";
 import { ownerAuthenticatedFromStore } from "@/lib/server/auth";
 
 type UpdateProductPayload = {
@@ -20,11 +24,7 @@ function extractIdentifier(request: Request, params?: RouteParams) {
 
 async function findProductOr404(identifier: string) {
   if (!identifier) return null;
-  return prisma.product.findFirst({
-    where: {
-      OR: [{ id: identifier }, { slug: identifier }],
-    },
-  });
+  return getProductByIdentifier(identifier);
 }
 
 export async function PATCH(
@@ -57,10 +57,13 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.product.update({
-      where: { id: product.id },
-      data: { price: cents },
-    });
+    const updated = await updateProductPrice(product.id, cents);
+    if (!updated) {
+      return NextResponse.json(
+        { message: "Produto nao encontrado ou nao foi possivel atualizar." },
+        { status: 404 },
+      );
+    }
     revalidatePath("/");
     revalidatePath(`/product/${updated.slug}`);
     return NextResponse.json({ product: updated });
@@ -93,9 +96,13 @@ export async function DELETE(
       );
     }
 
-    const deleted = await prisma.product.delete({
-      where: { id: product.id },
-    });
+    const deleted = await deleteProductRecord(product.id);
+    if (!deleted) {
+      return NextResponse.json(
+        { message: "Produto nao encontrado ou nao foi possivel remover." },
+        { status: 404 },
+      );
+    }
     revalidatePath("/");
     revalidatePath(`/product/${deleted.slug}`);
     return NextResponse.json({ ok: true });

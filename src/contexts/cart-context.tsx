@@ -7,8 +7,9 @@ import {
   useContext,
   useMemo,
   useReducer,
+  useEffect,
 } from "react";
-import { computeTotals, CouponLike } from "@/lib/pricing";
+import { computeTotals } from "@/lib/pricing";
 
 export type CartItem = {
   productId: string;
@@ -21,8 +22,6 @@ export type CartItem = {
 
 type CartState = {
   items: CartItem[];
-  coupon?: CouponLike | null;
-  couponCode?: string;
 };
 
 type Action =
@@ -30,20 +29,17 @@ type Action =
   | { type: "REMOVE_ITEM"; productId: string }
   | { type: "UPDATE_QTY"; productId: string; quantity: number }
   | { type: "CLEAR" }
-  | { type: "SET_COUPON"; coupon: CouponLike | null; code?: string };
+  | { type: "HYDRATE"; items: CartItem[] };
 
 type CartContextValue = CartState & {
   addItem: (item: CartItem) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clear: () => void;
-  setCoupon: (coupon: CouponLike | null, code?: string) => void;
 };
 
 const initialState: CartState = {
   items: [],
-  coupon: null,
-  couponCode: undefined,
 };
 
 function cartReducer(state: CartState, action: Action): CartState {
@@ -80,8 +76,8 @@ function cartReducer(state: CartState, action: Action): CartState {
       };
     case "CLEAR":
       return initialState;
-    case "SET_COUPON":
-      return { ...state, coupon: action.coupon, couponCode: action.code };
+    case "HYDRATE":
+      return { ...state, items: action.items };
     default:
       return state;
   }
@@ -91,6 +87,29 @@ const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, initialState);
+  const STORAGE_KEY = "jl-cart-items";
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as CartItem[];
+        if (Array.isArray(parsed)) {
+          dispatch({ type: "HYDRATE", items: parsed });
+        }
+      }
+    } catch {
+      // ignore bad stored data
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [state.items]);
 
   const addItem = useCallback((item: CartItem) => {
     dispatch({ type: "ADD_ITEM", item });
@@ -108,10 +127,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "CLEAR" });
   }, []);
 
-  const setCoupon = useCallback((coupon: CouponLike | null, code?: string) => {
-    dispatch({ type: "SET_COUPON", coupon, code });
-  }, []);
-
   const value = useMemo<CartContextValue>(
     () => ({
       ...state,
@@ -119,9 +134,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       updateQuantity,
       clear,
-      setCoupon,
     }),
-    [state, addItem, removeItem, updateQuantity, clear, setCoupon],
+    [state, addItem, removeItem, updateQuantity, clear],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
@@ -143,7 +157,7 @@ export function useCartStore<T = CartContextValue>(
 }
 
 export function useCartTotals() {
-  const { items, coupon } = useCartContext();
+  const { items } = useCartContext();
   const itemCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const totals = computeTotals(
     items.map((item) => ({
@@ -151,7 +165,6 @@ export function useCartTotals() {
       quantity: item.quantity,
       price: item.price,
     })),
-    coupon ?? undefined,
   );
   return { ...totals, itemCount };
 }

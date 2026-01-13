@@ -1,22 +1,30 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+﻿import type { Metadata } from "next";
+import { Fraunces, JetBrains_Mono, Nunito } from "next/font/google";
 import "./globals.css";
 import ClientShell from "./client-shell";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const body = Nunito({
+  variable: "--font-body",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const display = Fraunces({
+  variable: "--font-display",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  variable: "--font-jetbrains",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "JLsaborperfeito",
+  title: "Confeitaria Pedaço Do Céu",
   description:
-    "JLsaborperfeito - loja virtual de doces artesanais com carrinho, checkout e painel da dona.",
+    "Confeitaria Pedaço Do Céu - loja virtual de doces artesanais com carrinho, finalizacao de pedido e painel da dona.",
 };
 
 export default function RootLayout({
@@ -26,7 +34,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${body.variable} ${display.variable} ${mono.variable} antialiased`}>
         <ClientShell>{children}</ClientShell>
       </body>
     </html>

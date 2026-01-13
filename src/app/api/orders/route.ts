@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
 import { createOrder, getOrdersByEmail } from "@/lib/server/orders";
+import type { CartLineInput } from "@/lib/server/pricing";
+
+type CreateOrderPayload = {
+  customerEmail?: string;
+  customerName?: string | null;
+  items?: CartLineInput[];
+  paymentIntentId?: string | null;
+};
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -18,30 +26,31 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { customerEmail, customerName, items, couponCode, paymentIntentId } =
-      body;
+    const payload = (await request.json().catch(() => ({}))) as CreateOrderPayload;
+    const customerEmail = payload.customerEmail?.trim().toLowerCase();
+    const customerName = payload.customerName?.trim() || undefined;
+    const items = payload.items ?? [];
+    const paymentIntentId = payload.paymentIntentId?.trim() || undefined;
 
-    if (!customerEmail || !items?.length) {
+    if (!customerEmail || !items.length) {
       return NextResponse.json(
-        { error: "Email e itens são obrigatórios" },
+        { error: "Email e itens sao obrigatorios" },
         { status: 400 },
       );
     }
 
     const { order, pricing } = await createOrder({
-      customerEmail: String(customerEmail).toLowerCase(),
-      customerName: customerName ? String(customerName) : undefined,
+      customerEmail,
+      customerName,
       items,
-      couponCode: couponCode ? String(couponCode) : undefined,
-      paymentIntentId: paymentIntentId ? String(paymentIntentId) : undefined,
+      paymentIntentId,
     });
 
     return NextResponse.json({ order, pricing }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: "Não foi possível criar o pedido" },
+      { error: "Nao foi possivel criar o pedido" },
       { status: 400 },
     );
   }

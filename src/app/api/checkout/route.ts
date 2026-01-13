@@ -1,29 +1,59 @@
-import Stripe from "stripe";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { priceCart } from "@/lib/server/pricing";
+import { getServerEnv } from "@/lib/server/env";
+import { priceCart, type CartLineInput } from "@/lib/server/pricing";
 
-const stripeSecret = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecret
-  ? new Stripe(stripeSecret, {
-      typescript: true,
-    })
-  : null;
+type CheckoutPayload = {
+  items?: CartLineInput[];
+  email?: string | null;
+};
+
+async function createStripePaymentIntent(
+  amount: number,
+  email?: string | null,
+  stripeSecret?: string | null,
+) {
+  if (!stripeSecret) return null;
+  const params = new URLSearchParams();
+  params.append("amount", String(amount));
+  params.append("currency", "brl");
+  params.append("automatic_payment_methods[enabled]", "true");
+  if (email) params.append("receipt_email", email);
+
+  const response = await fetch("https://api.stripe.com/v1/payment_intents", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeSecret}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => "Stripe request failed");
+    throw new Error(details);
+  }
+
+  return (await response.json()) as { id: string; client_secret: string };
+}
 
 export async function POST(request: Request) {
-  try {
-    const { items, couponCode, email } = await request.json();
+  const stripeSecret = getServerEnv().STRIPE_SECRET_KEY;
 
-    if (!items?.length) {
+  try {
+    const payload = (await request.json().catch(() => ({}))) as CheckoutPayload;
+    const items = payload.items ?? [];
+    const email = payload.email ?? undefined;
+
+    if (!items.length) {
       return NextResponse.json(
-        { error: "Itens são obrigatórios" },
+        { error: "Itens sao obrigatorios" },
         { status: 400 },
       );
     }
 
-    const priced = await priceCart(prisma, items, couponCode);
+    const priced = await priceCart(items);
 
-    if (!stripe || priced.total === 0) {
+    if (!stripeSecret || priced.total === 0) {
       return NextResponse.json({
         mode: "mock",
         pricing: priced,
@@ -32,15 +62,17 @@ export async function POST(request: Request) {
       });
     }
 
-    const intent = await stripe.paymentIntents.create({
-      amount: priced.total,
-      currency: "brl",
-      receipt_email: email,
-      automatic_payment_methods: { enabled: true },
-      metadata: {
-        coupon: priced.coupon?.code ?? "",
-      },
-    });
+    const intent = await createStripePaymentIntent(
+      priced.total,
+      email,
+      stripeSecret,
+    );
+    if (!intent) {
+      return NextResponse.json(
+        { error: "Nao foi possivel iniciar a finalizacao do pedido" },
+        { status: 400 },
+      );
+    }
 
     return NextResponse.json({
       mode: "stripe",
@@ -51,7 +83,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error(error);
     return NextResponse.json(
-      { error: "Não foi possível iniciar o checkout" },
+      { error: "Nao foi possivel iniciar a finalizacao do pedido" },
       { status: 400 },
     );
   }

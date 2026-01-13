@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -45,6 +45,68 @@ const initialFormState: ProductFormState = {
   image: "",
 };
 
+function dataUrlToFile(dataUrl: string, filename: string) {
+  const arr = dataUrl.split(",");
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch?.[1] || "image/jpeg";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
+
+async function compressImage(file: File, opts?: { maxSize?: number; quality?: number }) {
+  const maxSize = opts?.maxSize ?? 1400; // px
+  const quality = opts?.quality ?? 0.8;
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler imagem."));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Nao foi possivel carregar a imagem."));
+    img.src = dataUrl;
+  });
+
+  const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+  const targetWidth = Math.max(1, Math.round(image.width * scale));
+  const targetHeight = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas indisponivel para comprimir imagem.");
+  ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const compressedDataUrl = await new Promise<string>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error("Nao foi possivel comprimir a imagem."));
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler blob comprimido."));
+        reader.readAsDataURL(blob);
+      },
+      "image/jpeg",
+      quality,
+    );
+  });
+
+  const compressedFile = dataUrlToFile(
+    compressedDataUrl,
+    `doce-${Date.now()}-${file.name.replace(/\s+/g, "-")}.jpg`,
+  );
+  return { compressedFile, previewDataUrl: compressedDataUrl };
+}
+
 function parsePrice(value: string) {
   if (!value) return null;
   const normalized = value.replace(/\./g, "").replace(",", ".");
@@ -57,6 +119,7 @@ function normalizeImagePath(value: string) {
   if (!value) return undefined;
   const trimmed = value.trim();
   if (!trimmed) return undefined;
+  if (trimmed.startsWith("data:")) return trimmed;
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/")) {
     return trimmed;
   }
@@ -67,13 +130,12 @@ function normalizeImagePath(value: string) {
 
 export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
   const router = useRouter();
-  const { status, owner, pending, requestCode, login, logout } = useAuth();
+  const { status, owner, pending, login, logout } = useAuth();
   const [products, setProducts] = useState<ProductDTO[]>(initialProducts);
   const [formState, setFormState] = useState<ProductFormState>(initialFormState);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [codeInfo, setCodeInfo] = useState<string | null>(null);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [codeInput, setCodeInput] = useState("");
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [createMessage, setCreateMessage] = useState<string | null>(null);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [imageUploadMessage, setImageUploadMessage] = useState<string | null>(null);
@@ -83,6 +145,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(initialProducts[0]?.id ?? "");
   const [priceInput, setPriceInput] = useState("");
+  const [imagePreview, setImagePreview] = useState<{ src: string; name: string } | null>(null);
   const [heroTitle, setHeroTitle] = useState(initialHeroCopy.heroTitle);
   const [heroDescription, setHeroDescription] = useState(initialHeroCopy.heroDescription);
   const [heroMessage, setHeroMessage] = useState<string | null>(null);
@@ -108,8 +171,13 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
     if (!file) return;
     setUploadingImage(true);
     try {
-      const path = await uploadProductImage(file);
+      const { compressedFile, previewDataUrl } = await compressImage(file).catch(() => ({
+        compressedFile: file,
+        previewDataUrl: null,
+      }));
+      const path = await uploadProductImage(compressedFile);
       setFormState((prev) => ({ ...prev, image: path }));
+      setImagePreview({ src: previewDataUrl ?? path, name: compressedFile.name });
       setImageUploadMessage("Imagem anexada com sucesso!");
     } catch (error) {
       const message =
@@ -166,36 +234,19 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
     }
   };
 
-  const handleRequestCode = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoginError(null);
-    if (!loginEmail) {
-      setLoginError("Informe o email da dona para receber o codigo.");
-      return;
-    }
-    const response = await requestCode(loginEmail);
-    if (!response.success) {
-      setCodeInfo(null);
-      setLoginError(response.message ?? "Nao foi possivel enviar o codigo.");
-      return;
-    }
-    setCodeInfo(response.message ?? "Codigo enviado para o email cadastrado.");
-  };
-
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoginError(null);
-    if (!loginEmail || !codeInput) {
-      setLoginError("Preencha email e codigo para acessar.");
+    if (!loginPhone || !loginPassword) {
+      setLoginError("Preencha login e senha para acessar.");
       return;
     }
-    const result = await login(loginEmail, codeInput);
+    const result = await login(loginPhone, loginPassword);
     if (!result.success) {
       setLoginError(result.message ?? "Nao foi possivel autenticar.");
     } else {
       setLoginError(null);
-      setCodeInfo(null);
-      setCodeInput("");
+      setLoginPassword("");
     }
   };
 
@@ -224,6 +275,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
       setProducts((prev) => [...prev, product]);
       setSelectedProductId(product.id);
       setFormState(initialFormState);
+      setImagePreview(null);
       setCreateMessage("Novo doce publicado com sucesso!");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao cadastrar doce.";
@@ -291,20 +343,24 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
   return (
     <section
       id="painel-da-dona"
-      className="rounded-3xl bg-linear-to-br from-[#fff5e5] via-[#ffe3c2] to-[#ffd08d] p-8 shadow-lg"
+      className="relative overflow-hidden rounded-3xl border border-[var(--jl-amber)]/40 p-8 shadow-xl jl-paper jl-reveal"
     >
-        <div className="flex flex-col gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--jl-crimson)]/70">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute right-6 top-6 h-20 w-20 rounded-full border-2 border-dotted border-[var(--jl-crimson)]/30"
+      />
+      <div className="flex flex-col gap-3">
+        <p className="jl-pill inline-flex items-center border border-[var(--jl-amber)]/70 bg-[var(--jl-cream)] px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-[var(--jl-crimson)]">
           Painel da dona
         </p>
-        <h2 className="text-3xl font-semibold text-[var(--jl-crimson-dark)]">
+        <h2 className="jl-display text-3xl font-semibold text-[var(--jl-crimson-dark)]">
           {status === "authenticated" && owner
             ? `Bem-vinda de volta, ${owner.name.split(" ")[0]}`
-            : "Cuide do seu cardapio de doces"}
+            : "Acesse com login e senha"}
         </h2>
-        <p className="text-sm text-[var(--jl-crimson)]">
-          Aqui voce adiciona novidades e ajusta precos da vitrine. Apenas a dona autenticada pode
-          mexer nos doces.
+        <div aria-hidden="true" className="h-2 w-28 jl-dotted-divider opacity-70" />
+        <p className="text-sm text-[var(--jl-crimson)]/80">
+          Digite o login cadastrado e a senha da dona para entrar. Apenas a dona autenticada pode mexer nos doces.
         </p>
       </div>
 
@@ -313,59 +369,50 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
       )}
 
       {status !== "authenticated" && status !== "loading" && (
-        <div className="mt-6 grid gap-4 rounded-2xl bg-white/70 p-6 text-sm shadow-inner">
-          <form className="grid gap-4" onSubmit={handleRequestCode}>
-            <div>
-              <label htmlFor="login-email" className="text-xs font-semibold uppercase text-[var(--jl-crimson)]/80">
-                Email da dona
-              </label>
-              <input
-                id="login-email"
-                name="email"
-                type="email"
-                placeholder="dona@doces.com"
-                value={loginEmail}
-                onChange={(event) => setLoginEmail(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white/80 px-4 py-2"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="rounded-xl border border-[var(--jl-amber)] px-4 py-2 font-semibold text-[var(--jl-crimson)] transition hover:bg-[#fff5e5]"
-              disabled={pending}
-            >
-              {pending ? "Enviando codigo..." : "Enviar codigo de acesso"}
-            </button>
-          </form>
+        <div className="mt-6 grid gap-4 rounded-2xl p-6 text-sm jl-paper">
           <form className="grid gap-4" onSubmit={handleLogin}>
-            <div>
-              <label htmlFor="login-code" className="text-xs font-semibold uppercase text-[var(--jl-crimson)]/80">
-                Codigo recebido por email
+            <div className="flex flex-col gap-1">
+              <label htmlFor="login-identifier" className="text-xs font-semibold uppercase text-[var(--jl-crimson)]/80">
+                Login
               </label>
               <input
-                id="login-code"
-                name="code"
+                id="login-identifier"
+                name="login"
                 type="text"
-                inputMode="numeric"
-                placeholder="123456"
-                value={codeInput}
-                onChange={(event) => setCodeInput(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white/80 px-4 py-2 tracking-[0.3em]"
+                autoComplete="username"
+                placeholder="Digite seu login"
+                value={loginPhone}
+                onChange={(event) => setLoginPhone(event.target.value)}
+                className="w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)]/90 px-4 py-2"
                 required
               />
             </div>
-            {codeInfo && <p className="text-xs text-[var(--jl-crimson)]/80">{codeInfo}</p>}
-            {loginError && <p className="text-sm text-[#b21b1f]">{loginError}</p>}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="login-password" className="text-xs font-semibold uppercase text-[var(--jl-crimson)]/80">
+                Senha
+              </label>
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Senha da dona"
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+                className="w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)]/90 px-4 py-2"
+                required
+              />
+            </div>
+            {loginError && <p className="text-sm text-[var(--jl-crimson)]">{loginError}</p>}
             <button
               type="submit"
-              className="rounded-xl bg-[var(--jl-crimson)] px-4 py-2 font-semibold text-white transition hover:bg-[#fff5e5]0"
+              className="w-full rounded-xl bg-[var(--jl-crimson)] px-4 py-3 font-semibold text-white transition hover:bg-[var(--jl-crimson-dark)]"
               disabled={pending}
             >
-              {pending ? "Verificando..." : "Acessar painel"}
+              {pending ? "Verificando..." : "Entrar com login e senha"}
             </button>
             <p className="text-xs text-[var(--jl-crimson)]/80">
-              Cada acesso usa um codigo novo enviado para o email cadastrado.
+              Acesso exclusivo com login e senha cadastrados da dona.
             </p>
           </form>
         </div>
@@ -373,9 +420,9 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
 
       {status === "authenticated" && (
         <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <div className="rounded-2xl bg-white/80 p-5 shadow">
+          <div className="rounded-2xl p-5 jl-paper">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--jl-crimson-dark)]">Cadastrar doce</h3>
+              <h3 className="jl-display text-lg font-semibold text-[var(--jl-crimson-dark)]">Cadastrar doce</h3>
               <button
                 type="button"
                 onClick={logout}
@@ -392,7 +439,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                 </label>
                 <input
                   type="text"
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   value={formState.name}
                   onChange={(event) =>
                     setFormState((prev) => ({ ...prev, name: event.target.value }))
@@ -403,7 +450,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
               <div>
                 <label className="text-xs font-semibold uppercase text-[var(--jl-crimson)]/80">Descricao</label>
                 <textarea
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   rows={3}
                   value={formState.description}
                   onChange={(event) =>
@@ -418,7 +465,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                    className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                     placeholder="12,90"
                     value={formState.price}
                     onChange={(event) =>
@@ -432,7 +479,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   <input
                     type="number"
                     min={0}
-                    className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                    className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                     value={formState.stock}
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, stock: event.target.value }))
@@ -447,7 +494,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   </label>
                   <input
                     type="text"
-                    className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                    className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                     value={formState.category}
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, category: event.target.value }))
@@ -461,12 +508,26 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   <input
                     type="file"
                     accept="image/*"
-                    className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2 text-sm"
+                    className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2 text-sm"
                     onChange={handleImageUpload}
                     disabled={uploadingImage}
                   />
-                  {formState.image && (
-                    <p className="mt-1 text-xs text-[var(--jl-crimson)]/80 break-all">{formState.image}</p>
+                  {imagePreview && (
+                    <div className="mt-2 flex items-center gap-3 rounded-xl border border-[var(--jl-amber)]/70 bg-[var(--jl-cream)] p-2">
+                      <div className="h-16 w-16 overflow-hidden rounded-lg bg-[var(--jl-sand)]">
+                        <img
+                          src={imagePreview.src}
+                          alt={`Preview de ${imagePreview.name}`}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="text-xs text-[var(--jl-crimson)]/90">
+                        <p className="font-semibold">Imagem anexada</p>
+                        <p className="max-w-[160px] truncate" title={imagePreview.name}>
+                          {imagePreview.name}
+                        </p>
+                      </div>
+                    </div>
                   )}
                   {imageUploadMessage && (
                     <p className="mt-1 text-xs text-[var(--jl-crimson)]/80">{imageUploadMessage}</p>
@@ -476,7 +537,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
               {createMessage && <p className="text-sm text-[var(--jl-crimson)]">{createMessage}</p>}
               <button
                 type="submit"
-                className="w-full rounded-xl bg-[var(--jl-crimson)] px-4 py-2 font-semibold text-white transition hover:bg-[#fff5e5]0"
+                className="w-full rounded-xl bg-[var(--jl-crimson)] px-4 py-2 font-semibold text-white transition hover:bg-[var(--jl-crimson-dark)]"
                 disabled={savingNewProduct}
               >
                 {savingNewProduct ? "Publicando..." : "Adicionar doce"}
@@ -484,15 +545,15 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
             </form>
           </div>
 
-          <div className="rounded-2xl bg-white/80 p-5 shadow">
-            <h3 className="text-lg font-semibold text-[var(--jl-crimson-dark)]">Reajustar preco ou remover</h3>
+          <div className="rounded-2xl p-5 jl-paper">
+            <h3 className="jl-display text-lg font-semibold text-[var(--jl-crimson-dark)]">Reajustar preco ou remover</h3>
             <form className="mt-4 space-y-4 text-sm" onSubmit={handleUpdatePrice}>
               <div>
                 <label className="text-xs font-semibold uppercase text-[var(--jl-crimson)]/80">Produto</label>
                 <select
                   value={selectedProductId}
                   onChange={(event) => setSelectedProductId(event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                 >
                   {products.map((product) => (
                     <option key={product.id} value={product.id}>
@@ -515,7 +576,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   type="text"
                   inputMode="decimal"
                   placeholder="15,00"
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   value={priceInput}
                   onChange={(event) => setPriceInput(event.target.value)}
                 />
@@ -524,14 +585,14 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
               <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="submit"
-                  className="rounded-xl bg-[var(--jl-gold)] px-4 py-2 font-semibold text-[var(--jl-crimson)] transition hover:bg-[#ffd76b]"
+                  className="rounded-xl bg-[var(--jl-gold)] px-4 py-2 font-semibold text-[var(--jl-crimson)] transition hover:bg-[var(--jl-amber)]"
                   disabled={savingPrice || products.length === 0}
                 >
                   {savingPrice ? "Salvando..." : "Atualizar valor"}
                 </button>
                 <button
                   type="button"
-                  className="rounded-xl border border-[var(--jl-amber)] px-4 py-2 font-semibold text-[var(--jl-crimson)] transition hover:bg-[#fff5e5]"
+                  className="rounded-xl border border-[var(--jl-amber)] px-4 py-2 font-semibold text-[var(--jl-crimson)] transition hover:bg-[var(--jl-sand)]"
                   onClick={handleDeleteProduct}
                   disabled={deletingProduct || products.length === 0}
                 >
@@ -541,8 +602,8 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
             </form>
           </div>
 
-          <div className="rounded-2xl bg-white/80 p-5 shadow md:col-span-2">
-            <h3 className="text-lg font-semibold text-[var(--jl-crimson-dark)]">Narrativa da vitrine</h3>
+          <div className="rounded-2xl p-5 jl-paper md:col-span-2">
+            <h3 className="jl-display text-lg font-semibold text-[var(--jl-crimson-dark)]">Narrativa da vitrine</h3>
             <p className="text-sm text-[var(--jl-crimson)]">
               Personalize o titulo, descricao e cartoes do painel principal da loja.
             </p>
@@ -553,7 +614,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                 </label>
                 <input
                   type="text"
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   value={heroTitle}
                   onChange={(event) => setHeroTitle(event.target.value)}
                 />
@@ -564,7 +625,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                 </label>
                 <input
                   type="text"
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   value={panelTopTitle}
                   onChange={(event) => setPanelTopTitle(event.target.value)}
                 />
@@ -574,7 +635,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   Descricao do cartao principal
                 </label>
                 <textarea
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   rows={3}
                   value={panelTopDescription}
                   onChange={(event) => setPanelTopDescription(event.target.value)}
@@ -586,7 +647,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                 </label>
                 <input
                   type="text"
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   value={panelBottomTitle}
                   onChange={(event) => setPanelBottomTitle(event.target.value)}
                 />
@@ -596,7 +657,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   Descricao do cartao secundario
                 </label>
                 <textarea
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   rows={3}
                   value={panelBottomDescription}
                   onChange={(event) => setPanelBottomDescription(event.target.value)}
@@ -607,7 +668,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   Texto de apoio do painel
                 </label>
                 <textarea
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   rows={3}
                   value={panelFooter}
                   onChange={(event) => setPanelFooter(event.target.value)}
@@ -618,7 +679,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                   Descricao do banner
                 </label>
                 <textarea
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   rows={4}
                   value={heroDescription}
                   onChange={(event) => setHeroDescription(event.target.value)}
@@ -630,7 +691,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
                 </label>
                 <input
                   type="text"
-                  className="mt-1 w-full rounded-xl border border-[#f2c27b] bg-white px-4 py-2"
+                  className="mt-1 w-full rounded-xl border border-[var(--jl-amber)] bg-[var(--jl-ivory)] px-4 py-2"
                   value={heroBadge}
                   onChange={(event) => setHeroBadge(event.target.value)}
                 />
@@ -641,7 +702,7 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
               {heroMessage && <p className="text-sm text-[var(--jl-crimson)]">{heroMessage}</p>}
               <button
                 type="submit"
-                className="w-full rounded-xl bg-[var(--jl-crimson)] px-4 py-2 font-semibold text-white transition hover:bg-[#fff5e5]0"
+                className="w-full rounded-xl bg-[var(--jl-crimson)] px-4 py-2 font-semibold text-white transition hover:bg-[var(--jl-crimson-dark)]"
               >
                 Atualizar banner
               </button>
@@ -652,3 +713,5 @@ export function OwnerPanel({ initialProducts, initialHeroCopy }: Props) {
     </section>
   );
 }
+
+

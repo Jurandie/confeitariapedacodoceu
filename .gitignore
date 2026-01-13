@@ -34,8 +34,9 @@ yarn-error.log*
 .env*
 dev.db
 
-# vercel
+# vercel / open-next
 .vercel
+.open-next/
 
 # typescript
 *.tsbuildinfo

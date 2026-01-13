@@ -9,13 +9,6 @@ export type ProductDTO = {
   category?: string | null;
 };
 
-export type CouponDTO = {
-  code: string;
-  type: "PERCENT" | "FIXED";
-  value: number;
-  minValue?: number | null;
-};
-
 export type OrderItemDTO = {
   id: string;
   quantity: number;
@@ -33,7 +26,6 @@ export type OrderDTO = {
   customerEmail: string;
   customerName?: string | null;
   createdAt: string | Date;
-  coupon?: CouponDTO | null;
   items: OrderItemDTO[];
 };
 
@@ -42,5 +34,4 @@ export type PricingDTO = {
   discount: number;
   shipping: number;
   total: number;
-  coupon?: CouponDTO | null;
 };

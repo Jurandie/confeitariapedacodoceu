@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ownerAuthenticatedFromStore } from "@/lib/server/auth";
-import { randomUUID } from "node:crypto";
-import path from "node:path";
-import { promises as fs } from "node:fs";
-
+import { getServerEnv } from "@/lib/server/env";
 const DEFAULT_MAX_UPLOAD = 5 * 1024 * 1024; // 5MB
 
 export async function POST(request: Request) {
@@ -20,9 +17,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Envie um arquivo de imagem valido." }, { status: 400 });
   }
 
+  const env = getServerEnv();
   const maxUpload =
-    Number(process.env.UPLOAD_LIMIT_BYTES ?? DEFAULT_MAX_UPLOAD) || DEFAULT_MAX_UPLOAD;
-
+    Number(env.UPLOAD_LIMIT_BYTES ?? DEFAULT_MAX_UPLOAD) || DEFAULT_MAX_UPLOAD;
   if (file.size > maxUpload) {
     return NextResponse.json(
       { message: `Imagem maior do que o limite de ${(maxUpload / 1024 / 1024).toFixed(1)}MB.` },
@@ -30,18 +27,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const ext = path.extname(file.name || "").toLowerCase();
-  const allowedExts = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif"];
-  const finalExt = allowedExts.includes(ext) ? ext : ".png";
-  const filename = `${randomUUID()}${finalExt}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type || "image/png";
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = toBase64(arrayBuffer);
+  const dataUri = `data:${mimeType};base64,${base64}`;
 
-  await fs.mkdir(uploadDir, { recursive: true });
-  await fs.writeFile(path.join(uploadDir, filename), buffer);
+  return NextResponse.json({ ok: true, path: dataUri });
+}
 
-  return NextResponse.json({
-    ok: true,
-    path: `/uploads/${filename}`,
-  });
+function toBase64(buffer: ArrayBuffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const slice = bytes.subarray(i, i + chunk);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
 }

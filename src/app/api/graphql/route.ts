@@ -1,6 +1,6 @@
 import { createSchema, createYoga } from "graphql-yoga";
-import { prisma } from "@/lib/prisma";
 import { createOrder, getOrdersByEmail } from "@/lib/server/orders";
+import { listProducts } from "@/lib/server/storefront-data";
 
 const schema = createSchema({
   typeDefs: /* GraphQL */ `
@@ -13,13 +13,6 @@ const schema = createSchema({
       image: String
       stock: Int!
       category: String
-    }
-
-    type Coupon {
-      code: String!
-      type: String!
-      value: Int!
-      minValue: Int
     }
 
     type OrderItem {
@@ -39,7 +32,6 @@ const schema = createSchema({
       customerEmail: String!
       customerName: String
       createdAt: String!
-      coupon: Coupon
       items: [OrderItem!]!
     }
 
@@ -48,7 +40,6 @@ const schema = createSchema({
       discount: Int!
       shipping: Int!
       total: Int!
-      couponCode: String
     }
 
     input CartItemInput {
@@ -71,13 +62,12 @@ const schema = createSchema({
         email: String!
         name: String
         items: [CartItemInput!]!
-        couponCode: String
       ): OrderResult!
     }
   `,
   resolvers: {
     Query: {
-      products: () => prisma.product.findMany({ orderBy: { name: "asc" } }),
+      products: () => listProducts(),
       orders: async (_: unknown, { email }: { email: string }) =>
         getOrdersByEmail(email.toLowerCase()),
     },
@@ -88,14 +78,12 @@ const schema = createSchema({
           email: string;
           name?: string | null;
           items: { productId: string; quantity: number }[];
-          couponCode?: string | null;
         },
       ) => {
         const { order, pricing } = await createOrder({
           customerEmail: args.email.toLowerCase(),
           customerName: args.name ?? undefined,
           items: args.items,
-          couponCode: args.couponCode ?? undefined,
         });
 
         return {
@@ -105,7 +93,6 @@ const schema = createSchema({
             discount: pricing.discount,
             shipping: pricing.shipping,
             total: pricing.total,
-            couponCode: pricing.coupon?.code ?? null,
           },
         };
       },

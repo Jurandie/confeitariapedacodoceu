@@ -1,26 +1,151 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fdf4e4;
-  --foreground: #2a0c0c;
-  --jl-crimson: #8c1014;
-  --jl-crimson-dark: #5f0a0e;
-  --jl-crimson-light: #a61a1d;
-  --jl-gold: #f6c148;
-  --jl-amber: #f0a624;
-  --jl-cream: #fff3df;
+  --background: #f7eee7;
+  --foreground: #4a2a1d;
+  --jl-crimson: #7a3f2a;
+  --jl-crimson-dark: #5b2d1e;
+  --jl-crimson-light: #9a5d3f;
+  --jl-cocoa: #6b3b27;
+  --jl-gold: #e7cdbb;
+  --jl-amber: #d5b096;
+  --jl-cream: #fdf6f0;
+  --jl-sand: #f1dfd2;
+  --jl-biscuit: #cfa284;
+  --jl-rose: #f4e2d6;
+  --jl-ivory: #fffaf6;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-jetbrains);
 }
 
 body {
-  background: radial-gradient(circle at 30% 20%, #ffeccb 0, #fcd08a 40%, #f8b44d 70%) fixed,
-    var(--background);
+  background:
+    radial-gradient(circle, rgba(122, 63, 42, 0.06) 1px, transparent 1px) 0 0 / 20px 20px,
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.85), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(255, 255, 255, 0.75), transparent 40%),
+    linear-gradient(180deg, var(--jl-ivory) 0%, var(--background) 40%, var(--jl-rose) 100%);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
+}
+
+@keyframes jl-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+@keyframes jl-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.jl-display {
+  font-family: var(--font-display), var(--font-body), system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.jl-reveal {
+  animation: jl-rise 0.8s ease-out both;
+}
+
+.jl-float-slow {
+  animation: jl-float 10s ease-in-out infinite;
+}
+
+.jl-float-medium {
+  animation: jl-float 7s ease-in-out infinite;
+}
+
+.jl-scallop-band {
+  --scallop: 36px;
+  background-image:
+    linear-gradient(180deg, var(--jl-crimson-light) 0%, var(--jl-crimson) 100%),
+    radial-gradient(
+      circle at calc(var(--scallop) / 2) calc(var(--scallop) / 2),
+      var(--jl-crimson-dark) calc(var(--scallop) / 2),
+      transparent calc(var(--scallop) / 2 + 1px)
+    );
+  background-size: 100% 70%, var(--scallop) var(--scallop);
+  background-position: 0 0, 0 100%;
+  background-repeat: no-repeat, repeat-x;
+}
+
+.jl-dotted-divider {
+  background-image: radial-gradient(circle, rgba(122, 63, 42, 0.35) 1.5px, transparent 1.6px);
+  background-size: 14px 14px;
+}
+
+.jl-wave-divider {
+  --wave: 20px;
+  background-image: radial-gradient(
+    circle at calc(var(--wave) / 2) calc(var(--wave) / 2),
+    rgba(122, 63, 42, 0.14) calc(var(--wave) / 2),
+    transparent calc(var(--wave) / 2 + 1px)
+  );
+  background-size: var(--wave) var(--wave);
+  background-repeat: repeat-x;
+}
+
+.jl-paper {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.7)),
+    radial-gradient(circle at 12% 18%, rgba(122, 63, 42, 0.08), transparent 55%),
+    var(--jl-cream);
+  border: 1px solid rgba(122, 63, 42, 0.16);
+  box-shadow:
+    0 20px 40px rgba(74, 42, 29, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.jl-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.7)),
+    radial-gradient(circle at 80% 0%, rgba(122, 63, 42, 0.06), transparent 45%),
+    var(--jl-cream);
+  border: 1px dashed rgba(122, 63, 42, 0.2);
+  box-shadow:
+    0 16px 30px rgba(74, 42, 29, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.jl-card:hover {
+  box-shadow:
+    0 26px 45px rgba(74, 42, 29, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.jl-pill {
+  border-radius: 999px;
+  box-shadow: 0 8px 16px rgba(74, 42, 29, 0.12);
+}
+
+.jl-stamp {
+  border-radius: 999px;
+  border: 2px dotted rgba(122, 63, 42, 0.35);
+  box-shadow:
+    inset 0 0 0 6px rgba(255, 255, 255, 0.6),
+    0 14px 26px rgba(74, 42, 29, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jl-float-slow,
+  .jl-float-medium,
+  .jl-reveal {
+    animation: none;
+  }
 }

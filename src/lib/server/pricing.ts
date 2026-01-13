@@ -1,10 +1,21 @@
-import { Coupon, PrismaClient, Product } from "@prisma/client";
 import { computeTotals } from "../pricing";
+import { queryAll } from "./d1";
 
 export type CartLineInput = { productId: string; quantity: number };
 
+type ProductRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  price: number;
+  image?: string | null;
+  stock: number;
+  category?: string | null;
+};
+
 export type PricedLine = {
-  product: Product;
+  product: ProductRecord;
   quantity: number;
   unitPrice: number;
 };
@@ -15,23 +26,9 @@ export type PricingResult = {
   discount: number;
   shipping: number;
   total: number;
-  coupon: Coupon | null;
 };
 
-function validateCoupon(coupon: Coupon | null, subtotal: number) {
-  if (!coupon) return null;
-  if (!coupon.active) return null;
-  if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) return null;
-  if (coupon.minValue && subtotal < coupon.minValue) return null;
-  if (coupon.expiresAt && coupon.expiresAt.getTime() < Date.now()) return null;
-  return coupon;
-}
-
-export async function priceCart(
-  prisma: PrismaClient,
-  lines: CartLineInput[],
-  couponCode?: string,
-): Promise<PricingResult> {
+export async function priceCart(lines: CartLineInput[]): Promise<PricingResult> {
   if (!lines.length) {
     return {
       lines: [],
@@ -39,24 +36,26 @@ export async function priceCart(
       discount: 0,
       shipping: 0,
       total: 0,
-      coupon: null,
     };
   }
 
-  const ids = lines.map((l) => l.productId);
-  const products = await prisma.product.findMany({
-    where: { id: { in: ids } },
-  });
+  const ids = Array.from(new Set(lines.map((l) => l.productId)));
+  const placeholders = ids.map(() => "?").join(",");
+  const products = await queryAll<ProductRecord>(
+    `SELECT * FROM Product WHERE id IN (${placeholders})`,
+    ids,
+  );
 
   const enriched: PricedLine[] = lines.map((line) => {
     const product = products.find((p) => p.id === line.productId);
     if (!product) {
-      throw new Error(`Produto não encontrado: ${line.productId}`);
+      throw new Error(`Produto nao encontrado: ${line.productId}`);
     }
     if (line.quantity < 1) {
-      throw new Error(`Quantidade inválida para ${product.name}`);
+      throw new Error(`Quantidade invalida para ${product.name}`);
     }
-    if (product.stock && line.quantity > product.stock) {
+    const hasFiniteStock = product.stock !== null && product.stock !== undefined;
+    if (hasFiniteStock && line.quantity > product.stock) {
       throw new Error(`Estoque insuficiente para ${product.name}`);
     }
     return { product, quantity: line.quantity, unitPrice: product.price };
@@ -67,30 +66,12 @@ export async function priceCart(
     0,
   );
 
-  let coupon: Coupon | null = null;
-  if (couponCode) {
-    coupon = await prisma.coupon.findUnique({
-      where: { code: couponCode.toUpperCase() },
-    });
-  }
-
-  const validCoupon = validateCoupon(coupon, subtotal);
   const { discount, shipping, total } = computeTotals(
     enriched.map((l) => ({
       productId: l.product.id,
       quantity: l.quantity,
       price: l.unitPrice,
     })),
-    validCoupon
-      ? {
-          code: validCoupon.code,
-          type: validCoupon.type as "PERCENT" | "FIXED",
-          value: validCoupon.value,
-          minValue: validCoupon.minValue,
-          expiresAt: validCoupon.expiresAt,
-          active: validCoupon.active,
-        }
-      : undefined,
   );
 
   return {
@@ -99,6 +80,5 @@ export async function priceCart(
     discount,
     shipping,
     total,
-    coupon: validCoupon ?? null,
   };
 }

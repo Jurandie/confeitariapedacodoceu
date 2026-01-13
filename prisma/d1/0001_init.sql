@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE "Product" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
@@ -65,6 +65,21 @@ CREATE TABLE "OwnerAccessCode" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- CreateTable
+CREATE TABLE "SiteConfig" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "heroTitle" TEXT NOT NULL,
+    "heroDescription" TEXT NOT NULL,
+    "heroBadge" TEXT NOT NULL DEFAULT 'vitrine artesanal + finalizar pedido',
+    "heroPanelTopTitle" TEXT NOT NULL DEFAULT 'Jornal da cozinha',
+    "heroPanelTopDescription" TEXT NOT NULL DEFAULT 'Receitas novas, ajustes de preco e fotos atualizadas direto da cozinha da JL.',
+    "heroPanelBottomTitle" TEXT NOT NULL DEFAULT 'Panelinha da JL',
+    "heroPanelBottomDescription" TEXT NOT NULL DEFAULT 'Dashboard com relatorio de estoque, doces mais pedidos e campanhas de frete gratuito. Tudo pronto para registrar novas delicias.',
+    "heroPanelFooter" TEXT NOT NULL DEFAULT 'Replique cenarios reais de confeitaria sem precisar de Stripe real. Ideal para apresentar jornadas completas e pontos de personalizacao para clientes gulosos.',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Product_slug_key" ON "Product"("slug");
 
@@ -74,27 +89,3 @@ CREATE UNIQUE INDEX "Coupon_code_key" ON "Coupon"("code");
 -- CreateIndex
 CREATE INDEX "OwnerAccessCode_email_expiresAt_idx" ON "OwnerAccessCode"("email", "expiresAt");
 
--- CreateTable
-CREATE TABLE "OwnerAccount" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "name" TEXT NOT NULL,
-    "phone" TEXT NOT NULL,
-    "passwordHash" TEXT NOT NULL,
-    "passwordSalt" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
-);
-
--- CreateTable
-CREATE TABLE "OwnerSession" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "ownerId" TEXT NOT NULL,
-    "token" TEXT NOT NULL,
-    "expiresAt" INTEGER NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "OwnerSession_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "OwnerAccount" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateIndex
-CREATE UNIQUE INDEX "OwnerAccount_phone_key" ON "OwnerAccount"("phone");
-CREATE UNIQUE INDEX "OwnerSession_token_key" ON "OwnerSession"("token");

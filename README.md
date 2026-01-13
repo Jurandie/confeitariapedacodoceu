@@ -1,77 +1,41 @@
-# JLsaborperfeito
+﻿# Confeitaria Pedacos do Ceu
 
-Loja virtual de doces artesanais construída em Next.js (App Router) com carrinho, checkout simulado, cupons e um painel privado para a dona cadastrar novidades ou ajustar preços. A vitrine usa o tema “JLsaborperfeito” e todo o conteúdo do banner/painel pode ser editado pela dona diretamente no site.
+Loja virtual de doces artesanais com vitrine, carrinho, finalizacao de pedido e um painel privado para a dona atualizar o catalogo e os textos do site. Pensado para apresentar os produtos e agilizar o atendimento, sem depender de suporte tecnico no dia a dia.
 
-## Scripts
+## Para quem este projeto serve
 
-- `npm run dev` – ambiente de desenvolvimento (`http://localhost:3000`)
-- `npm run build` – build de produção
-- `npm run start` – serve o build gerado
-- `npm run lint` – verifica o projeto com ESLint
+- Dona/gestora: publica novidades, ajusta precos e estoque.
+- Atendimento: recebe pedidos claros e completos.
+- Clientes: escolhem doces e fecham o pedido com poucos cliques.
+- Marketing/Design: ajusta textos e destaques da vitrine.
+- TI/Desenvolvimento: encontra uma base pronta para evoluir.
 
-## Rodando local
+## O que foi implementado
 
-```bash
-npm install
-npx prisma db execute --file prisma/migration.sql --schema prisma/schema.prisma
-node prisma/seed.mjs          # popula doces, cupons e pedidos de exemplo
-npm run dev
-```
+- Pagina inicial com banner e vitrine de produtos.
+- Pagina de detalhes do doce com foto, descricao e estoque.
+- Carrinho com ajuste de quantidade e total automatico.
+- Finalizacao de pedido com resumo e envio para atendimento.
+- Painel privado para cadastrar, editar e remover produtos.
+- Upload de imagens e edicao dos textos da vitrine.
+- Registro de pedidos e base preparada para crescer.
 
-> Se preferir deixar o Prisma criar a estrutura automaticamente, use `npx prisma db push` em vez do `db execute`.
+## Fluxo do cliente
 
-## Estrutura
+1. Navega pelo catalogo e escolhe os doces.
+2. Confere o carrinho e o total.
+3. Finaliza o pedido e envia o resumo.
+4. A confeitaria confirma e segue com o atendimento.
 
-- `src/app` – páginas, layouts e rotas do App Router (cardápio, carrinho, checkout, orders e painel).
-- `src/components` – componentes de UI (owner panel, header, product grid etc.).
-- `src/app/api` – rotas REST protegidas (auth OTP, products CRUD, coupons, checkout, uploads e site-config).
-- `src/lib` – helpers de autenticação, pricing, Prisma, mailer e server actions.
-- `prisma` – schema, migrações e scripts de seed.
+## Para quem vai desenvolver (opcional)
 
-## Variáveis de ambiente
+- Instale as dependencias e rode o projeto localmente.
+- Configure seus dados locais conforme a necessidade.
+- As configuracoes sensiveis ficam fora do repositorio.
 
-```
-DATABASE_URL="file:./dev.db"
-STRIPE_SECRET_KEY="sk_test_xxx"        # opcional para checkout real
-OWNER_EMAIL="pinheiroaqui@gmail.com"
-OWNER_NAME="Dona Caramelo"
-OWNER_SESSION_SECRET="troque-por-um-segredo"
-OWNER_CODE_TTL_MINUTES="10"
-SMTP_HOST=...
-SMTP_PORT=...
-SMTP_USER=...
-SMTP_PASSWORD=...
-MAILER_FROM="Doces da Dona <nao-responda@docesdadona.com>"
-```
+## Onde fica cada parte
 
-> **Preparando para Cloudflare Pages**  
-> Ao configurar o projeto no painel da Cloudflare, cadastre exatamente os nomes acima em **Settings → Environment variables**. Para produção, substitua `DATABASE_URL` por um banco acessível pela Cloudflare (ex.: Postgres gerenciado, Supabase, PlanetScale ou Cloudflare D1). Anote a URL de conexão desse banco e cole no lugar de `file:./dev.db`. As chaves `OWNER_*`, `SMTP_*` e `MAILER_FROM` permanecem iguais — apenas utilize credenciais de e-mail reais para que o código OTP chegue na caixa de entrada.
-
-Sem SMTP configurado o modo dev apenas loga o código OTP no console; em produção use credenciais reais.
-
-## Flows implementados
-
-- **Cardápio e detalhe do doce** (`/` e `/product/[slug]`)
-- **Carrinho e aplicação de cupom** (`/cart`)
-- **Checkout simulado** com integração Stripe fake ou sandbox (`/checkout`)
-- **Histórico do cliente** (`/orders`)
-- **Painel da dona** (`/#painel-da-dona`) com login via código OTP, CRUD manual do cardápio, upload de imagens e edição dos textos do banner.
-- **GraphQL** (`/api/graphql`) expondo `products`, `orders(email)` e `placeOrder`.
-
-## APIs principais
-
-- `GET /api/products` – lista doces
-- `POST /api/products` – cria doces (autenticado)
-- `PATCH /api/products/:id` e `DELETE /api/products/:id` – ajustes/remoções autenticadas
-- `POST /api/coupons` – validação de cupons no carrinho
-- `POST /api/checkout` e `POST /api/orders` – cálculo final e persistência de pedidos
-- `POST /api/uploads/product-image` – upload autenticado em `public/uploads`
-- `POST /api/auth/request-code`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/session`
-- `POST /api/site-config` – edição do título/descrição do banner e cards
-
-## Notas rápidas
-
-- Frete: R$25 até atingir o limite gratuito (`FREE_SHIPPING_FROM = 30000` centavos).
-- Cupons seed: `BEMVINDO10`, `FRETEGRATIS`, `VEMDOCARAMELO`.
-- Preços são armazenados em centavos.
-- O painel usa contextos + React Query para refletir o cardápio atualizado sem precisar recarregar a página.
+- `src/app`: paginas do site.
+- `src/components`: componentes da interface.
+- `src/app/api`: camada de dados e operacoes do painel.
+- `prisma`: estrutura do banco e dados de exemplo.

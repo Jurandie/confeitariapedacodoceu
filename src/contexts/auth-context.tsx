@@ -12,7 +12,7 @@ import {
 
 type OwnerProfile = {
   name: string;
-  email: string;
+  phone: string;
 };
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
@@ -21,19 +21,18 @@ type AuthContextValue = {
   status: AuthStatus;
   owner: OwnerProfile | null;
   pending: boolean;
-  requestCode: (email: string) => Promise<{ success: boolean; message?: string }>;
-  login: (email: string, code: string) => Promise<{ success: boolean; message?: string }>;
+  login: (phone: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-async function parseJson(response: Response) {
+async function parseJson<T = Record<string, unknown>>(response: Response): Promise<T> {
   try {
-    return await response.json();
+    return (await response.json()) as T;
   } catch {
-    return {};
+    return {} as T;
   }
 }
 
@@ -46,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch("/api/auth/session", { cache: "no-store" });
       if (!res.ok) throw new Error("Falha ao carregar sessao");
-      const data = await res.json();
+      const data = await parseJson<{ authenticated?: boolean; owner?: OwnerProfile | null }>(res);
       setStatus(data.authenticated ? "authenticated" : "anonymous");
       setOwner(data.owner ?? null);
     } catch {
@@ -59,37 +58,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const requestCode = useCallback(async (email: string) => {
-    setPending(true);
-    try {
-      const res = await fetch("/api/auth/request-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await parseJson(res);
-      if (!res.ok) {
-        return { success: false, message: data?.message ?? "Nao foi possivel enviar o codigo." };
-      }
-      return { success: true, message: data?.message };
-    } catch {
-      return { success: false, message: "Erro ao enviar codigo. Tente novamente." };
-    } finally {
-      setPending(false);
-    }
-  }, []);
-
   const login = useCallback(
-    async (email: string, code: string) => {
+    async (phone: string, password: string) => {
       setPending(true);
       try {
         const res = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, code }),
+          body: JSON.stringify({ login: phone, password }),
         });
 
-        const data = await parseJson(res);
+        const data = await parseJson<{ owner?: OwnerProfile | null; message?: string }>(res);
 
         if (!res.ok) {
           return { success: false, message: data?.message ?? "Nao foi possivel fazer login." };
@@ -124,11 +103,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       owner,
       pending,
       login,
-      requestCode,
       logout,
       refresh,
     }),
-    [status, owner, pending, requestCode, login, logout, refresh],
+    [status, owner, pending, login, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

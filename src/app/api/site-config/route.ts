@@ -1,25 +1,25 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+﻿import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ownerAuthenticatedFromStore } from "@/lib/server/auth";
+import { getSiteConfig, saveSiteConfig } from "@/lib/server/storefront-data";
 
 const DEFAULT_HERO = {
-  heroTitle: "JLsaborperfeito e um playground acucarado para uma confeiteira digital.",
+  heroTitle: "Confeitaria Pedaço Do Céu e um playground acucarado para uma confeiteira digital.",
   heroDescription:
     "Aqui a vitrine virtual recebe receitas fresquinhas: cupcakes florais, brigadeiros gourmet e tortas de festa. O painel da dona funciona como o caderno de receitas que nunca fecha -- crie lotes, ajuste precos e publique fotos direto da cozinha.",
-  heroBadge: "vitrine artesanal + checkout",
+  heroBadge: "vitrine artesanal + finalizar pedido",
   heroPanelTopTitle: "Jornal da cozinha",
   heroPanelTopDescription:
-    "Receitas novas, ajustes de preco e fotos atualizadas direto da cozinha da JL.",
-  heroPanelBottomTitle: "Panelinha da JL",
+    "Receitas novas, ajustes de preco e fotos atualizadas direto da cozinha da Confeitaria Pedaço Do Céu.",
+  heroPanelBottomTitle: "Panelinha da Confeitaria Pedaço Do Céu",
   heroPanelBottomDescription:
-    "Dashboard com relatorio de estoque, doces mais pedidos e campanhas de frete gratuito. Tudo pronto para registrar novas delicias.",
+    "Dashboard com relatorio de estoque, doces mais pedidos e campanhas de novos sabores. Tudo pronto para registrar novas delicias.",
   heroPanelFooter:
     "Replique cenarios reais de confeitaria sem precisar de Stripe real. Ideal para apresentar jornadas completas e pontos de personalizacao para clientes gulosos.",
 };
 
 export async function GET() {
-  const config = await prisma.siteConfig.findFirst();
+  const config = await getSiteConfig();
   return NextResponse.json(config ?? { id: "hero", ...DEFAULT_HERO });
 }
 
@@ -65,29 +65,15 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const updated = await prisma.siteConfig.upsert({
-    where: { id: "hero" },
-    update: {
-      heroTitle,
-      heroDescription,
-      heroBadge,
-      heroPanelTopTitle,
-      heroPanelTopDescription,
-      heroPanelBottomTitle,
-      heroPanelBottomDescription,
-      heroPanelFooter,
-    },
-    create: {
-      id: "hero",
-      heroTitle,
-      heroDescription,
-      heroBadge,
-      heroPanelTopTitle,
-      heroPanelTopDescription,
-      heroPanelBottomTitle,
-      heroPanelBottomDescription,
-      heroPanelFooter,
-    },
+  const updated = await saveSiteConfig({
+    heroTitle,
+    heroDescription,
+    heroBadge,
+    heroPanelTopTitle,
+    heroPanelTopDescription,
+    heroPanelBottomTitle,
+    heroPanelBottomDescription,
+    heroPanelFooter,
   });
 
   return NextResponse.json({ ok: true, config: updated });

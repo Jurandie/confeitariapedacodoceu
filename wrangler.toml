@@ -1,0 +1,19 @@
+name = "confeitariapedacodoceu"
+main = ".open-next/worker.js"
+compatibility_date = "2025-12-08"
+compatibility_flags = ["global_fetch_strictly_public", "nodejs_compat"]
+account_id = "96e09efc9b84a7e66330e6a7aa534053"
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "confeitariapedacodoceu"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "confeitariapedacodoceu"
+database_id = "809bae01-c5d6-4035-80df-31aa4e8ffaf3"
+migrations_dir = "prisma/d1"
