@@ -1,41 +1,41 @@
-﻿# Confeitaria Pedacos do Ceu
+# Confeitaria Pedacos do Ceu
 
-Loja virtual de doces artesanais com vitrine, carrinho, finalizacao de pedido e um painel privado para a dona atualizar o catalogo e os textos do site. Pensado para apresentar os produtos e agilizar o atendimento, sem depender de suporte tecnico no dia a dia.
+Online store for handmade sweets with a storefront, cart, checkout flow, and a private admin panel so the owner can update the catalog and site copy without depending on daily technical support.
 
-## Para quem este projeto serve
+## Who This Project Is For
 
-- Dona/gestora: publica novidades, ajusta precos e estoque.
-- Atendimento: recebe pedidos claros e completos.
-- Clientes: escolhem doces e fecham o pedido com poucos cliques.
-- Marketing/Design: ajusta textos e destaques da vitrine.
-- TI/Desenvolvimento: encontra uma base pronta para evoluir.
+- Owner or manager: publishes updates, adjusts prices, and manages stock.
+- Customer service: receives clear and complete orders.
+- Customers: browse products and complete orders in a few clicks.
+- Marketing or design: updates copy and featured storefront sections.
+- IT or development: gets a ready-to-extend foundation.
 
-## O que foi implementado
+## What Has Been Implemented
 
-- Pagina inicial com banner e vitrine de produtos.
-- Pagina de detalhes do doce com foto, descricao e estoque.
-- Carrinho com ajuste de quantidade e total automatico.
-- Finalizacao de pedido com resumo e envio para atendimento.
-- Painel privado para cadastrar, editar e remover produtos.
-- Upload de imagens e edicao dos textos da vitrine.
-- Registro de pedidos e base preparada para crescer.
+- Home page with banner and product showcase.
+- Product details page with image, description, and stock information.
+- Cart with quantity adjustment and automatic total calculation.
+- Checkout flow with order summary and submission to service staff.
+- Private admin panel to create, edit, and remove products.
+- Image upload and storefront text editing.
+- Order records and a structure prepared for future growth.
 
-## Fluxo do cliente
+## Customer Flow
 
-1. Navega pelo catalogo e escolhe os doces.
-2. Confere o carrinho e o total.
-3. Finaliza o pedido e envia o resumo.
-4. A confeitaria confirma e segue com o atendimento.
+1. Browse the catalog and choose products.
+2. Review the cart and total.
+3. Complete the order and send the summary.
+4. The bakery confirms the order and continues the service flow.
 
-## Para quem vai desenvolver (opcional)
+## For Developers
 
-- Instale as dependencias e rode o projeto localmente.
-- Configure seus dados locais conforme a necessidade.
-- As configuracoes sensiveis ficam fora do repositorio.
+- Install dependencies and run the project locally.
+- Configure local data as needed.
+- Sensitive configuration stays outside the repository.
 
-## Onde fica cada parte
+## Project Structure
 
-- `src/app`: paginas do site.
-- `src/components`: componentes da interface.
-- `src/app/api`: camada de dados e operacoes do painel.
-- `prisma`: estrutura do banco e dados de exemplo.
+- `src/app`: site pages.
+- `src/components`: interface components.
+- `src/app/api`: data layer and admin operations.
+- `prisma`: database structure and sample data.
